@@ -1,162 +1,209 @@
 <!DOCTYPE html>
 <html lang="sv">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ryberg Survival</title>
-    <style>
-        body { margin: 0; background: #111; color: #0f0; overflow: hidden; font-family: 'Courier New', monospace; }
-        canvas { display: block; }
-        #hud { position: absolute; top: 15px; left: 15px; font-size: 22px; text-shadow: 2px 2px #000; }
-        #menu {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.9); padding: 40px; border: 3px solid #0f0; text-align: center; border-radius: 15px;
-        }
-        button { background: #0f0; color: #000; border: none; padding: 15px 40px; font-size: 20px; font-weight: bold; cursor: pointer; border-radius: 5px; }
-        button:hover { background: #0c0; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ryberg Survival</title>
+<style>
+body {
+    text-align: center;
+    background-color: #111;
+    color: #fff;
+    font-family: Arial, sans-serif;
+}
+
+canvas {
+    background-color: #222;
+    border: 2px solid #fff;
+    display: block;
+    margin: 0 auto;
+}
+
+#hud {
+    margin-top: 10px;
+    font-size: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+</style>
 </head>
 <body>
+<h1>Ryberg Survival</h1>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+<div id="hud">
+    <span id="score">Score: 0</span>
+    <span id="time">Tid: 0s</span>
+    <span id="lives">Liv: 3</span>
+</div>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-    <div id="hud">SCORE: <span id="s">0</span> | LIV: <span id="l">3</span></div>
-    
-    <div id="menu">
-        <h1>RYBERG ATTACK</h1>
-        <p>Gör dig redo!</p>
-        <p style="font-size: 14px; color: #888;">WASD för att röra dig<br>MUSKLICK för att skjuta</p>
-        <button id="go">STARTA</button>
-    </div>
+const player = {
+    x: canvas.width/2,
+    y: canvas.height/2,
+    width: 40,
+    height: 40,
+    speed: 5,
+    color: 'blue',
+    lives: 3,
+    bullets: []
+};
 
-    <canvas id="c"></canvas>
+let keys = {};
+let score = 0;
+let elapsedTime = 0;
+let enemies = [];
+let powerups = [];
+let lastEnemySpawn = 0;
+let lastPowerupSpawn = 0;
+let gameOver = false;
 
-    <script>
-        const canvas = document.getElementById('c');
-        const ctx = canvas.getContext('2d');
-        const menu = document.getElementById('menu');
-        
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+document.addEventListener('keydown', e => keys[e.key] = true);
+document.addEventListener('keyup', e => keys[e.key] = false);
+canvas.addEventListener('click', shootBullet);
 
-        // BILDHANTERING
-        let imgLoaded = false;
-        const enemyImg = new Image();
-        enemyImg.src = 'ryberg.jpg';
-        enemyImg.onload = () => { imgLoaded = true; };
-        enemyImg.onerror = () => { console.warn("Bilden ryberg.jpg hittades inte. Använder grafik-fallback."); };
+function shootBullet(e){
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+    player.bullets.push({x: player.x, y: player.y, angle, speed: 10});
+}
 
-        let score = 0, lives = 3, active = false;
-        let p = { x: canvas.width/2, y: canvas.height-100, w: 45, h: 45 };
-        let bullets = [], enemies = [], keys = {};
+function spawnEnemy(){
+    const side = Math.random() < 0.5 ? 'left' : 'right';
+    const x = side === 'left' ? 0 : canvas.width;
+    const y = Math.random()*canvas.height;
+    enemies.push({x, y, width: 40, height: 40, speed: 2});
+}
 
-        // Input
-        window.onkeydown = e => keys[e.code] = true;
-        window.onkeyup = e => keys[e.code] = false;
-        window.onmousedown = () => { if(active) shoot(); };
+function spawnPowerup(){
+    const x = Math.random() * (canvas.width-20);
+    const y = Math.random() * (canvas.height-20);
+    powerups.push({x, y, width: 20, height: 20, type:'heal'});
+}
 
-        function shoot() {
-            bullets.push({x: p.x + p.w/2 - 2, y: p.y, w: 4, h: 15});
-        }
+function resetGame(){
+    alert("Game Over! Score: " + score);
+    player.lives = 3;
+    score = 0;
+    elapsedTime = 0;
+    enemies = [];
+    powerups = [];
+    player.x = canvas.width/2;
+    player.y = canvas.height/2;
+    gameOver = false;
+}
 
-        document.getElementById('go').onclick = () => {
-            menu.style.display = 'none';
-            active = true;
-            resetGame();
-            loop();
-        };
+function update(deltaTime){
+    if(gameOver) return;
 
-        function resetGame() {
-            score = 0; lives = 3; bullets = []; enemies = [];
-            document.getElementById('s').innerText = score;
-            document.getElementById('l').innerText = lives;
-        }
+    elapsedTime += deltaTime/1000;
 
-        function update() {
-            // WASD Movement
-            if(keys['KeyW'] && p.y > 0) p.y -= 7;
-            if(keys['KeyS'] && p.y < canvas.height - p.h) p.y += 7;
-            if(keys['KeyA'] && p.x > 0) p.x -= 7;
-            if(keys['KeyD'] && p.x < canvas.width - p.w) p.x += 7;
+    // Player movement
+    if(keys['w'] || keys['ArrowUp']) player.y -= player.speed;
+    if(keys['s'] || keys['ArrowDown']) player.y += player.speed;
+    if(keys['a'] || keys['ArrowLeft']) player.x -= player.speed;
+    if(keys['d'] || keys['ArrowRight']) player.x += player.speed;
 
-            // Bullets
-            bullets.forEach((b, i) => {
-                b.y -= 10;
-                if(b.y < -20) bullets.splice(i, 1);
-            });
+    // Keep player in bounds
+    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+    player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
 
-            // Enemy Spawn (Ryberg dyker upp)
-            if(Math.random() < 0.03 + (score/2000)) {
-                enemies.push({ x: Math.random()*(canvas.width-70), y: -100, w: 70, h: 90, speed: 3 + (score/400) });
+    // Update bullets
+    player.bullets.forEach((b,i)=>{
+        b.x += Math.cos(b.angle)*b.speed;
+        b.y += Math.sin(b.angle)*b.speed;
+        if(b.x<0||b.x>canvas.width||b.y<0||b.y>canvas.height) player.bullets.splice(i,1);
+    });
+
+    // Update enemies
+    enemies.forEach((e,i)=>{
+        const dx = player.x - e.x;
+        const dy = player.y - e.y;
+        const dist = Math.hypot(dx,dy);
+        e.x += (dx/dist)*e.speed;
+        e.y += (dy/dist)*e.speed;
+
+        // Collision with bullets
+        player.bullets.forEach((b,j)=>{
+            if(b.x<e.x+e.width && b.x>e.x && b.y<e.y+e.height && b.y>e.y){
+                enemies.splice(i,1);
+                player.bullets.splice(j,1);
+                score +=10;
             }
+        });
 
-            enemies.forEach((e, i) => {
-                e.y += e.speed;
-                
-                // Kollision Spelare
-                if(e.x < p.x + p.w && e.x + e.w > p.x && e.y < p.y + p.h && e.y + e.h > p.y) {
-                    enemies.splice(i, 1);
-                    lives--;
-                    document.getElementById('l').innerText = lives;
-                    if(lives <= 0) {
-                        active = false;
-                        menu.style.display = 'block';
-                        document.querySelector('h1').innerText = "GAME OVER";
-                    }
-                }
-
-                // Kollision Skott
-                bullets.forEach((b, bi) => {
-                    if(b.x < e.x + e.w && b.x + b.w > e.x && b.y < e.y + e.h && b.y + b.h > e.y) {
-                        enemies.splice(i, 1);
-                        bullets.splice(bi, 1);
-                        score += 10;
-                        document.getElementById('s').innerText = score;
-                    }
-                });
-
-                if(e.y > canvas.height) enemies.splice(i, 1);
-            });
+        // Collision with player
+        if(player.x<e.x+e.width && player.x+player.width>e.x &&
+           player.y<e.y+e.height && player.y+player.height>e.y){
+            enemies.splice(i,1);
+            player.lives -=1;
+            if(player.lives<=0){
+                gameOver = true;
+                resetGame();
+            }
         }
+    });
 
-        function draw() {
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Spelare (Neonbox)
-            ctx.fillStyle = '#0f0';
-            ctx.fillRect(p.x, p.y, p.w, p.h);
-            ctx.strokeStyle = '#fff';
-            ctx.strokeRect(p.x, p.y, p.w, p.h);
-
-            // Skott
-            ctx.fillStyle = '#ff0';
-            bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
-
-            // Fiender
-            enemies.forEach(e => {
-                if(imgLoaded) {
-                    ctx.drawImage(enemyImg, e.x, e.y, e.w, e.h);
-                } else {
-                    // Om bilden saknas: rita en röd gubbe
-                    ctx.fillStyle = 'red';
-                    ctx.fillRect(e.x, e.y, e.w, e.h);
-                    ctx.fillStyle = 'white';
-                    ctx.fillText("RYBERG", e.x + 5, e.y + 40);
-                }
-            });
+    // Powerups
+    powerups.forEach((p,i)=>{
+        if(player.x<p.x+p.width && player.x+player.width>p.x &&
+           player.y<p.y+p.height && player.y+player.height>p.y){
+            if(p.type==='heal') player.lives = Math.min(player.lives+1,5);
+            powerups.splice(i,1);
         }
+    });
 
-        function loop() {
-            if(!active) return;
-            update();
-            draw();
-            requestAnimationFrame(loop);
-        }
+    // Spawn enemies/powerups
+    if(Date.now() - lastEnemySpawn > 2000){
+        spawnEnemy();
+        lastEnemySpawn = Date.now();
+    }
+    if(Date.now() - lastPowerupSpawn > 8000){
+        spawnPowerup();
+        lastPowerupSpawn = Date.now();
+    }
 
-        // Hantera fönsterstorlek
-        window.onresize = () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        };
-    </script>
+    // Update HUD
+    document.getElementById('score').textContent = "Score: "+score;
+    document.getElementById('time').textContent = "Tid: "+Math.floor(elapsedTime)+"s";
+    document.getElementById('lives').textContent = "Liv: "+player.lives;
+}
+
+function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // Player
+    ctx.fillStyle = player.color;
+    ctx.fillRect(player.x,player.y,player.width,player.height);
+
+    // Bullets
+    ctx.fillStyle='yellow';
+    player.bullets.forEach(b=>ctx.fillRect(b.x-5,b.y-5,10,10));
+
+    // Enemies
+    ctx.fillStyle='red';
+    enemies.forEach(e=>ctx.fillRect(e.x,e.y,e.width,e.height));
+
+    // Powerups
+    ctx.fillStyle='green';
+    powerups.forEach(p=>ctx.fillRect(p.x,p.y,p.width,p.height));
+}
+
+let lastTime = 0;
+function gameLoop(timestamp){
+    const deltaTime = timestamp - lastTime;
+    lastTime = timestamp;
+    update(deltaTime);
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+requestAnimationFrame(gameLoop);
+</script>
 </body>
 </html>
+enemyImg.src = "friend.png"; // ryberg.jpg
