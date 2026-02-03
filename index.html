@@ -2,16 +2,18 @@
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
-    <title>Ryberg Emoji Attack</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ryberg Survival</title>
     <style>
         body { margin: 0; background: #111; color: #0f0; overflow: hidden; font-family: 'Courier New', monospace; }
         canvas { display: block; }
-        #hud { position: absolute; top: 10px; left: 10px; pointer-events: none; font-size: 20px; }
+        #hud { position: absolute; top: 15px; left: 15px; font-size: 22px; text-shadow: 2px 2px #000; }
         #menu {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.9); padding: 40px; border: 3px solid #0f0; text-align: center;
+            background: rgba(0,0,0,0.9); padding: 40px; border: 3px solid #0f0; text-align: center; border-radius: 15px;
         }
-        button { background: #0f0; color: #000; border: none; padding: 15px 30px; font-weight: bold; cursor: pointer; }
+        button { background: #0f0; color: #000; border: none; padding: 15px 40px; font-size: 20px; font-weight: bold; cursor: pointer; border-radius: 5px; }
+        button:hover { background: #0c0; }
     </style>
 </head>
 <body>
@@ -19,9 +21,10 @@
     <div id="hud">SCORE: <span id="s">0</span> | LIV: <span id="l">3</span></div>
     
     <div id="menu">
-        <h1>EMOJI INVASION</h1>
-        <p>Styr: WASD | Skjut: MUSKLICK</p>
-        <button id="go">STARTA SPELET</button>
+        <h1>RYBERG ATTACK</h1>
+        <p>Gör dig redo!</p>
+        <p style="font-size: 14px; color: #888;">WASD för att röra dig<br>MUSKLICK för att skjuta</p>
+        <button id="go">STARTA</button>
     </div>
 
     <canvas id="c"></canvas>
@@ -34,22 +37,38 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
+        // BILDHANTERING
+        let imgLoaded = false;
+        const enemyImg = new Image();
+        enemyImg.src = 'ryberg.jpg';
+        enemyImg.onload = () => { imgLoaded = true; };
+        enemyImg.onerror = () => { console.warn("Bilden ryberg.jpg hittades inte. Använder grafik-fallback."); };
+
         let score = 0, lives = 3, active = false;
-        let p = { x: canvas.width/2, y: canvas.height-100, w: 40, h: 40 };
+        let p = { x: canvas.width/2, y: canvas.height-100, w: 45, h: 45 };
         let bullets = [], enemies = [], keys = {};
 
+        // Input
         window.onkeydown = e => keys[e.code] = true;
         window.onkeyup = e => keys[e.code] = false;
-        
-        window.onmousedown = () => { 
-            if(active) bullets.push({x: p.x + 18, y: p.y, w: 4, h: 12}); 
-        };
+        window.onmousedown = () => { if(active) shoot(); };
+
+        function shoot() {
+            bullets.push({x: p.x + p.w/2 - 2, y: p.y, w: 4, h: 15});
+        }
 
         document.getElementById('go').onclick = () => {
             menu.style.display = 'none';
             active = true;
+            resetGame();
             loop();
         };
+
+        function resetGame() {
+            score = 0; lives = 3; bullets = []; enemies = [];
+            document.getElementById('s').innerText = score;
+            document.getElementById('l').innerText = lives;
+        }
 
         function update() {
             // WASD Movement
@@ -58,36 +77,35 @@
             if(keys['KeyA'] && p.x > 0) p.x -= 7;
             if(keys['KeyD'] && p.x < canvas.width - p.w) p.x += 7;
 
-            // Skott
+            // Bullets
             bullets.forEach((b, i) => {
-                b.y -= 12;
-                if(b.y < 0) bullets.splice(i, 1);
+                b.y -= 10;
+                if(b.y < -20) bullets.splice(i, 1);
             });
 
-            // Fiender (Vi ritar emojis istället för bild)
-            if(Math.random() < 0.04) {
-                enemies.push({ 
-                    x: Math.random()*(canvas.width-50), 
-                    y: -50, 
-                    size: 50, 
-                    speed: 3 + (score/300) 
-                });
+            // Enemy Spawn (Ryberg dyker upp)
+            if(Math.random() < 0.03 + (score/2000)) {
+                enemies.push({ x: Math.random()*(canvas.width-70), y: -100, w: 70, h: 90, speed: 3 + (score/400) });
             }
 
             enemies.forEach((e, i) => {
                 e.y += e.speed;
                 
                 // Kollision Spelare
-                if(e.x < p.x + p.w && e.x + e.size > p.x && e.y < p.y + p.h && e.y + e.size > p.y) {
+                if(e.x < p.x + p.w && e.x + e.w > p.x && e.y < p.y + p.h && e.y + e.h > p.y) {
                     enemies.splice(i, 1);
                     lives--;
                     document.getElementById('l').innerText = lives;
-                    if(lives <= 0) location.reload();
+                    if(lives <= 0) {
+                        active = false;
+                        menu.style.display = 'block';
+                        document.querySelector('h1').innerText = "GAME OVER";
+                    }
                 }
 
                 // Kollision Skott
                 bullets.forEach((b, bi) => {
-                    if(b.x < e.x + e.size && b.x + b.w > e.x && b.y < e.y + e.size && b.y + b.h > e.y) {
+                    if(b.x < e.x + e.w && b.x + b.w > e.x && b.y < e.y + e.h && b.y + b.h > e.y) {
                         enemies.splice(i, 1);
                         bullets.splice(bi, 1);
                         score += 10;
@@ -103,21 +121,27 @@
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Spelare (Neon-box)
+            // Spelare (Neonbox)
             ctx.fillStyle = '#0f0';
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = '#0f0';
             ctx.fillRect(p.x, p.y, p.w, p.h);
-            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#fff';
+            ctx.strokeRect(p.x, p.y, p.w, p.h);
 
             // Skott
             ctx.fillStyle = '#ff0';
             bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
 
-            // Fiender (Emojis)
-            ctx.font = "40px Arial";
+            // Fiender
             enemies.forEach(e => {
-                ctx.fillText("🤮", e.x, e.y + 40);
+                if(imgLoaded) {
+                    ctx.drawImage(enemyImg, e.x, e.y, e.w, e.h);
+                } else {
+                    // Om bilden saknas: rita en röd gubbe
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(e.x, e.y, e.w, e.h);
+                    ctx.fillStyle = 'white';
+                    ctx.fillText("RYBERG", e.x + 5, e.y + 40);
+                }
             });
         }
 
@@ -127,6 +151,12 @@
             draw();
             requestAnimationFrame(loop);
         }
+
+        // Hantera fönsterstorlek
+        window.onresize = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        };
     </script>
 </body>
 </html>
