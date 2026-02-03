@@ -10,6 +10,8 @@ body {
     background: linear-gradient(135deg,#1f1c2c,#928dab);
     color: #fff;
     font-family: Arial, sans-serif;
+    margin:0;
+    padding:0;
 }
 
 canvas {
@@ -28,6 +30,21 @@ canvas {
     justify-content: center;
     gap: 30px;
     font-weight: bold;
+    align-items: center;
+}
+
+#healthBar {
+    width: 200px;
+    height: 20px;
+    background: #444;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+#healthInner {
+    height: 100%;
+    background: linear-gradient(to right, #0f0,#0c0);
+    width: 100%;
 }
 </style>
 </head>
@@ -37,85 +54,88 @@ canvas {
 <div id="hud">
     <span id="score">Score: 0</span>
     <span id="time">Tid: 0s</span>
-    <span id="lives">Liv: 3</span>
+    <div id="healthBar"><div id="healthInner"></div></div>
 </div>
 
 <script>
-// Canvas
+// Canvas och spelare
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Spelare
 const player = {
     x: canvas.width/2,
     y: canvas.height/2,
     radius: 20,
     speed: 5,
     color: 'green',
-    lives: 3,
-    bullets: []
+    maxHealth: 100,
+    health: 100,
+    bullets: [],
+    fireRate: 500,
+    lastShot: 0
 };
 
-// Ljud (lägg mp3-filer i samma mapp)
-const shootSound = new Audio('shoot.mp3');
-const hitSound = new Audio('hit.mp3');
-const powerupSound = new Audio('powerup.mp3');
-const gameOverSound = new Audio('gameover.mp3');
-
-// Fiender och powerups
-let enemies = [];
-let powerups = [];
+// Spelvariabler
+let keys = {};
 let score = 0;
 let elapsedTime = 0;
+let enemies = [];
+let powerups = [];
 let lastEnemySpawn = 0;
 let lastPowerupSpawn = 0;
 let gameOver = false;
 
-let keys = {};
+// Base64-ljud (för enkelhet)
+const shootSound = new Audio('data:audio/mp3;base64,//uQxAAAAAAAAAAAA...');
+const hitSound = new Audio('data:audio/mp3;base64,//uQxAAAAAAAAAAAA...');
+const powerupSound = new Audio('data:audio/mp3;base64,//uQxAAAAAAAAAAAA...');
+const gameOverSound = new Audio('data:audio/mp3;base64,//uQxAAAAAAAAAAAA...');
 
-document.addEventListener('keydown', e => keys[e.key] = true);
-document.addEventListener('keyup', e => keys[e.key] = false);
-canvas.addEventListener('click', shootBullet);
+document.addEventListener('keydown', e=>keys[e.key]=true);
+document.addEventListener('keyup', e=>keys[e.key]=false);
+canvas.addEventListener('click',shootBullet);
 
-// Skott
 function shootBullet(e){
+    const now = Date.now();
+    if(now - player.lastShot < player.fireRate) return;
+    player.lastShot = now;
+
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
     player.bullets.push({x: player.x, y: player.y, angle, speed: 10});
-    shootSound.currentTime = 0;
-    shootSound.play();
+    shootSound.currentTime=0; shootSound.play();
 }
 
-// Spawn fiender
+// Fiender
 function spawnEnemy(){
-    const side = Math.random() < 0.5 ? 'left' : 'right';
-    const x = side === 'left' ? 0 : canvas.width;
+    const side = Math.random()<0.5?'left':'right';
+    const x = side==='left'?0:canvas.width;
     const y = Math.random()*canvas.height;
     const size = Math.random()*15 + 15;
     const colors = ['red','orange','purple','blue'];
     const color = colors[Math.floor(Math.random()*colors.length)];
-    enemies.push({x,y,radius:size,speed:2 + Math.random()*2,color});
+    enemies.push({x,y,radius:size,speed:2+Math.random()*2,color});
 }
 
-// Spawn powerup
+// Powerups
 function spawnPowerup(){
     const x = Math.random()*(canvas.width-20)+10;
     const y = Math.random()*(canvas.height-20)+10;
-    powerups.push({x,y,radius:10,type:'heal'});
+    const type = Math.random()<0.5?'heal':'fast';
+    powerups.push({x,y,radius:10,type});
 }
 
-// Reset game
+// Reset
 function resetGame(){
-    player.lives = 3;
-    score = 0;
-    elapsedTime = 0;
-    enemies = [];
-    powerups = [];
+    player.health = player.maxHealth;
     player.x = canvas.width/2;
     player.y = canvas.height/2;
-    gameOver = false;
+    enemies=[]; powerups=[];
+    score = 0;
+    elapsedTime=0;
+    gameOver=false;
     gameOverSound.play();
 }
 
@@ -125,13 +145,13 @@ function update(deltaTime){
     elapsedTime += deltaTime/1000;
 
     // Rörelse
-    if(keys['w'] || keys['ArrowUp']) player.y -= player.speed;
-    if(keys['s'] || keys['ArrowDown']) player.y += player.speed;
-    if(keys['a'] || keys['ArrowLeft']) player.x -= player.speed;
-    if(keys['d'] || keys['ArrowRight']) player.x += player.speed;
+    if(keys['w']||keys['ArrowUp']) player.y -= player.speed;
+    if(keys['s']||keys['ArrowDown']) player.y += player.speed;
+    if(keys['a']||keys['ArrowLeft']) player.x -= player.speed;
+    if(keys['d']||keys['ArrowRight']) player.x += player.speed;
 
-    player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
-    player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
+    player.x = Math.max(player.radius,Math.min(canvas.width-player.radius,player.x));
+    player.y = Math.max(player.radius,Math.min(canvas.height-player.radius,player.y));
 
     // Skott
     player.bullets.forEach((b,i)=>{
@@ -148,55 +168,50 @@ function update(deltaTime){
         e.x += (dx/dist)*e.speed;
         e.y += (dy/dist)*e.speed;
 
-        // Skott träff
+        // Koll med skott
         player.bullets.forEach((b,j)=>{
-            const d = Math.hypot(b.x-e.x, b.y-e.y);
-            if(d < e.radius){
+            if(Math.hypot(b.x-e.x,b.y-e.y)<e.radius){
                 enemies.splice(i,1);
                 player.bullets.splice(j,1);
-                score += 10;
-                hitSound.currentTime = 0;
-                hitSound.play();
+                score+=10;
+                hitSound.currentTime=0; hitSound.play();
             }
         });
 
         // Koll med spelare
-        const distPlayer = Math.hypot(player.x-e.x, player.y-e.y);
-        if(distPlayer < e.radius + player.radius){
+        if(dist < e.radius+player.radius){
             enemies.splice(i,1);
-            player.lives -=1;
-            if(player.lives<=0){
-                gameOver = true;
-                resetGame();
+            player.health -= 20;
+            if(player.health<=0){
+                gameOver=true; resetGame();
             }
         }
     });
 
     // Powerups
     powerups.forEach((p,i)=>{
-        const d = Math.hypot(player.x - p.x, player.y - p.y);
-        if(d < player.radius + p.radius){
+        const d = Math.hypot(player.x-p.x,player.y-p.y);
+        if(d<player.radius+p.radius){
             powerups.splice(i,1);
-            player.lives = Math.min(player.lives+1,5);
-            powerupSound.currentTime = 0;
-            powerupSound.play();
+            if(p.type==='heal'){
+                player.health = Math.min(player.maxHealth,player.health+30);
+            } else if(p.type==='fast'){
+                player.fireRate = 200;
+                setTimeout(()=>player.fireRate=500,5000);
+            }
+            powerupSound.currentTime=0; powerupSound.play();
         }
     });
 
-    // Spawna fiender/powerups
-    if(Date.now() - lastEnemySpawn > 2000){
-        spawnEnemy();
-        lastEnemySpawn = Date.now();
-    }
-    if(Date.now() - lastPowerupSpawn > 8000){
-        spawnPowerup();
-        lastPowerupSpawn = Date.now();
-    }
+    // Spawn fiender/powerups
+    if(Date.now()-lastEnemySpawn>2000){spawnEnemy(); lastEnemySpawn=Date.now();}
+    if(Date.now()-lastPowerupSpawn>8000){spawnPowerup(); lastPowerupSpawn=Date.now();}
 
     // HUD
-    document.getElementById('score').textContent = "Score: "+score;
-    document.getElementById('time').textContent = "Tid: "+Math.floor(elapsedTime)+"s";
-    document.getElementById('lives').textContent = "Liv: "+player.lives;
+    document.getElementById('score').textContent="Score: "+score;
+    document.getElementById('time').textContent="Tid: "+Math.floor(elapsedTime)+"s";
+    const healthPct = (player.health/player.maxHealth)*100;
+    document.getElementById('healthInner').style.width = healthPct+"%";
 }
 
 // Draw
@@ -204,7 +219,7 @@ function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
     // Spelare
-    ctx.fillStyle = player.color;
+    ctx.fillStyle=player.color;
     ctx.beginPath();
     ctx.arc(player.x,player.y,player.radius,0,Math.PI*2);
     ctx.fill();
@@ -219,7 +234,7 @@ function draw(){
 
     // Fiender
     enemies.forEach(e=>{
-        ctx.fillStyle = e.color;
+        ctx.fillStyle=e.color;
         ctx.beginPath();
         ctx.arc(e.x,e.y,e.radius,0,Math.PI*2);
         ctx.fill();
@@ -227,22 +242,21 @@ function draw(){
 
     // Powerups
     powerups.forEach(p=>{
-        ctx.fillStyle='magenta';
+        ctx.fillStyle=p.type==='heal'?'lime':'cyan';
         ctx.beginPath();
         ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);
         ctx.fill();
     });
 }
 
-let lastTime = 0;
+let lastTime=0;
 function gameLoop(timestamp){
-    const deltaTime = timestamp - lastTime;
-    lastTime = timestamp;
+    const deltaTime=timestamp-lastTime;
+    lastTime=timestamp;
     update(deltaTime);
     draw();
     requestAnimationFrame(gameLoop);
 }
-
 requestAnimationFrame(gameLoop);
 </script>
 </body>
