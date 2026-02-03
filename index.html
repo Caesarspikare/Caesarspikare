@@ -2,32 +2,66 @@
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
-    <title>Ryberg Invasion</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ryberg Attack - WASD Edition</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; cursor: crosshair; }
-        canvas { display: block; }
-        #ui {
-            position: absolute; top: 10px; left: 10px; color: #fff;
-            font-size: 24px; pointer-events: none; z-index: 10;
+        body { 
+            margin: 0; 
+            padding: 0; 
+            overflow: hidden; 
+            background-color: #000; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            user-select: none;
         }
-        #start-screen {
-            position: absolute; width: 100%; height: 100%; 
-            display: flex; flex-direction: column; justify-content: center; 
-            align-items: center; background: rgba(0,0,0,0.8); color: white; z-index: 20;
+        canvas { 
+            display: block; 
+            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
         }
-        button { padding: 15px 30px; font-size: 20px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 5px; }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+        #overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        button {
+            padding: 15px 40px;
+            font-size: 20px;
+            background: #2ecc71;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 50px;
+            transition: transform 0.2s;
+        }
+        button:hover { transform: scale(1.1); }
+        .controls { margin-top: 20px; color: #aaa; font-size: 14px; }
     </style>
 </head>
 <body>
 
-    <div id="start-screen">
-        <h1>RYBERG INVASION</h1>
-        <p>Styr med WASD - Skjut med Vänsterklick</p>
-        <button onclick="startGame()">STARTA SPELET</button>
+    <div id="hud">
+        SCORE: <span id="scoreVal">0</span> | LIV: <span id="livesVal">3</span>
     </div>
 
-    <div id="ui">
-        SCORE: <span id="score">0</span> | LIV: <span id="lives">3</span>
+    <div id="overlay">
+        <h1 id="title">RYBERG ATTACK</h1>
+        <p id="desc">Din vän är efter dig! Överlev så länge du kan.</p>
+        <button id="startBtn">STARTA SPELET</button>
+        <div class="controls">WASD för att flytta | MUSKLICK för att skjuta</div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -35,96 +69,104 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        const overlay = document.getElementById('overlay');
+        const startBtn = document.getElementById('startBtn');
 
-        // BILDEN - Se till att den heter ryberg.jpg i samma mapp
-        const enemyImg = new Image();
-        enemyImg.src = 'ryberg.jpg'; 
-
+        // Speltillstånd
+        let gameRunning = false;
         let score = 0;
         let lives = 3;
-        let gameActive = false;
-        let projectiles = [];
         let enemies = [];
+        let bullets = [];
         let powerups = [];
+        let particles = [];
+        let isRapidFire = false;
 
+        // Ladda bilden
+        const rybergImg = new Image();
+        rybergImg.src = 'ryberg.jpg'; 
+
+        // Spelarobjekt
         const player = {
-            x: canvas.width / 2,
-            y: canvas.height - 100,
-            size: 40,
-            speed: 7,
+            x: 0, y: 0,
+            w: 40, h: 40,
+            speed: 6,
             color: '#00ff00'
         };
 
-        const keys = { w: false, a: false, s: false, d: false };
-
-        function startGame() {
-            document.getElementById('start-screen').style.display = 'none';
-            gameActive = true;
-            loop();
+        function init() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            player.x = canvas.width / 2;
+            player.y = canvas.height - 100;
         }
 
-        window.addEventListener('keydown', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true; });
-        window.addEventListener('keyup', e => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false; });
+        const keys = {};
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+        window.addEventListener('mousedown', () => { if(gameRunning) shoot(); });
+        window.addEventListener('resize', init);
 
-        window.addEventListener('mousedown', () => {
-            if (gameActive) projectiles.push({ x: player.x + 20, y: player.y, speed: 10 });
-        });
+        function shoot() {
+            bullets.push({ x: player.x + player.w/2 - 2, y: player.y, w: 4, h: 15, speed: 12 });
+        }
 
         class Enemy {
             constructor() {
-                this.size = 80;
-                this.x = Math.random() * (canvas.width - this.size);
-                this.y = -this.size;
-                this.speed = 2 + Math.random() * 3;
+                this.w = 70;
+                this.h = 90;
+                this.x = Math.random() * (canvas.width - this.w);
+                this.y = -this.h;
+                this.speed = 2 + Math.random() * 3 + (score / 500);
             }
+            update() { this.y += this.speed; }
             draw() {
-                // Om bilden är laddad, rita den. Annars rita en röd cirkel.
-                if (enemyImg.complete && enemyImg.naturalWidth !== 0) {
-                    ctx.drawImage(enemyImg, this.x, this.y, this.size, this.size);
+                if (rybergImg.complete && rybergImg.naturalWidth !== 0) {
+                    ctx.drawImage(rybergImg, this.x, this.y, this.w, this.h);
                 } else {
+                    // Fallback om bilden inte laddas
                     ctx.fillStyle = 'red';
-                    ctx.beginPath();
-                    ctx.arc(this.x + this.size/2, this.y + this.size/2, this.size/2, 0, Math.PI*2);
-                    ctx.fill();
+                    ctx.fillRect(this.x, this.y, this.w, this.h);
                 }
             }
         }
 
         function update() {
-            if (keys.w && player.y > 0) player.y -= player.speed;
-            if (keys.s && player.y < canvas.height - player.size) player.y += player.speed;
-            if (keys.a && player.x > 0) player.x -= player.speed;
-            if (keys.d && player.x < canvas.width - player.size) player.x += player.speed;
+            if (!gameRunning) return;
 
-            projectiles.forEach((p, i) => {
-                p.y -= p.speed;
-                if (p.y < 0) projectiles.splice(i, 1);
+            // Rörelse WASD
+            if (keys['KeyW'] && player.y > 0) player.y -= player.speed;
+            if (keys['KeyS'] && player.y < canvas.height - player.h) player.y += player.speed;
+            if (keys['KeyA'] && player.x > 0) player.x -= player.speed;
+            if (keys['KeyD'] && player.x < canvas.width - player.w) player.x += player.speed;
+
+            // Hantera skott
+            bullets.forEach((b, i) => {
+                b.y -= b.speed;
+                if (b.y < 0) bullets.splice(i, 1);
             });
 
-            if (Math.random() < 0.02) enemies.push(new Enemy());
+            // Hantera fiender
+            if (Math.random() < 0.02 + (score/10000)) enemies.push(new Enemy());
 
             enemies.forEach((e, ei) => {
-                e.y += e.speed;
-
-                // Kollision med spelare
-                if (e.y + e.size > player.y && e.y < player.y + player.size && 
-                    e.x < player.x + player.size && e.x + e.size > player.x) {
+                e.update();
+                
+                // Kollision fiende vs spelare
+                if (e.x < player.x + player.w && e.x + e.w > player.x && e.y < player.y + player.h && e.y + e.h > player.y) {
                     enemies.splice(ei, 1);
                     lives--;
-                    document.getElementById('lives').innerText = lives;
-                    if (lives <= 0) location.reload();
+                    document.getElementById('livesVal').innerText = lives;
+                    if (lives <= 0) gameOver();
                 }
 
-                // Kollision med skott
-                projectiles.forEach((p, pi) => {
-                    if (p.x > e.x && p.x < e.x + e.size && p.y > e.y && p.y < e.y + e.size) {
+                // Kollision skott vs fiende
+                bullets.forEach((b, bi) => {
+                    if (b.x < e.x + e.w && b.x + b.w > e.x && b.y < e.y + e.h && b.y + b.h > e.y) {
                         enemies.splice(ei, 1);
-                        projectiles.splice(pi, 1);
+                        bullets.splice(bi, 1);
                         score += 10;
-                        document.getElementById('score').innerText = score;
+                        document.getElementById('scoreVal').innerText = score;
                     }
                 });
 
@@ -133,27 +175,51 @@
         }
 
         function draw() {
-            ctx.fillStyle = 'black';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Rita spelare
+            // Spelare
             ctx.fillStyle = player.color;
-            ctx.fillRect(player.x, player.y, player.size, player.size);
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = player.color;
+            ctx.fillRect(player.x, player.y, player.w, player.h);
+            ctx.shadowBlur = 0;
 
-            // Rita skott
-            ctx.fillStyle = 'yellow';
-            projectiles.forEach(p => ctx.fillRect(p.x - 2, p.y, 4, 15));
+            // Skott
+            ctx.fillStyle = '#f1c40f';
+            bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
 
-            // Rita fiender
+            // Fiender
             enemies.forEach(e => e.draw());
         }
 
-        function loop() {
-            if (!gameActive) return;
+        function gameOver() {
+            gameRunning = false;
+            overlay.style.display = 'flex';
+            document.getElementById('title').innerText = "DU BLEV FÅNGAD!";
+            document.getElementById('desc').innerText = `Ryberg tog dig. Din poäng: ${score}`;
+            startBtn.innerText = "FÖRSÖK IGEN";
+            // Återställ
+            score = 0;
+            lives = 3;
+            enemies = [];
+            bullets = [];
+            document.getElementById('scoreVal').innerText = "0";
+            document.getElementById('livesVal').innerText = "3";
+        }
+
+        function gameLoop() {
             update();
             draw();
-            requestAnimationFrame(loop);
+            requestAnimationFrame(gameLoop);
         }
+
+        startBtn.addEventListener('click', () => {
+            overlay.style.display = 'none';
+            gameRunning = true;
+        });
+
+        init();
+        gameLoop();
     </script>
 </body>
 </html>
