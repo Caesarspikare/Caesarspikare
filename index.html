@@ -3,217 +3,151 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ryberg Survival</title>
+<title>Eat Jojjo!</title>
 <style>
 body {
-    text-align: center;
-    background-color: #111;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    height: 100vh;
+    margin: 0;
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(135deg, #ff9a9e, #fad0c4);
     color: #fff;
-    font-family: Arial, sans-serif;
+}
+
+h1 {
+    margin-top: 20px;
+    text-shadow: 2px 2px 5px #000;
 }
 
 canvas {
-    background-color: #222;
-    border: 2px solid #fff;
-    display: block;
-    margin: 0 auto;
+    background: #1e1e1e;
+    border-radius: 15px;
+    margin-top: 20px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
 }
 
 #hud {
     margin-top: 10px;
-    font-size: 20px;
-    display: flex;
-    justify-content: center;
-    gap: 20px;
+    font-size: 22px;
+    font-weight: bold;
+    text-shadow: 1px 1px 3px #000;
 }
 </style>
 </head>
 <body>
-<h1>Ryberg Survival</h1>
-<canvas id="gameCanvas" width="800" height="600"></canvas>
+<h1>Eat Jojjo!</h1>
+<canvas id="gameCanvas" width="400" height="400"></canvas>
 <div id="hud">
     <span id="score">Score: 0</span>
-    <span id="time">Tid: 0s</span>
-    <span id="lives">Liv: 3</span>
 </div>
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-const player = {
-    x: canvas.width/2,
-    y: canvas.height/2,
-    width: 40,
-    height: 40,
-    speed: 5,
-    color: 'blue',
-    lives: 3,
-    bullets: []
-};
-
-let keys = {};
+const gridSize = 20;
+let snake = [{x: 10, y: 10}];
+let direction = {x: 0, y: 0};
+let jojjo = {x: 5, y: 5};
 let score = 0;
-let elapsedTime = 0;
-let enemies = [];
-let powerups = [];
-let lastEnemySpawn = 0;
-let lastPowerupSpawn = 0;
 let gameOver = false;
 
-// Ladda fiendebilden (din fil från telefon)
-const enemyImg = new Image();
-enemyImg.src = "ryberg.jpg"; // <-- din bild
+document.addEventListener('keydown', e => {
+    switch(e.key){
+        case 'ArrowUp':
+        case 'w':
+            if(direction.y === 0) direction = {x:0, y:-1};
+            break;
+        case 'ArrowDown':
+        case 's':
+            if(direction.y === 0) direction = {x:0, y:1};
+            break;
+        case 'ArrowLeft':
+        case 'a':
+            if(direction.x === 0) direction = {x:-1, y:0};
+            break;
+        case 'ArrowRight':
+        case 'd':
+            if(direction.x === 0) direction = {x:1, y:0};
+            break;
+    }
+});
 
-document.addEventListener('keydown', e => keys[e.key] = true);
-document.addEventListener('keyup', e => keys[e.key] = false);
-canvas.addEventListener('click', shootBullet);
-
-function shootBullet(e){
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
-    player.bullets.push({x: player.x, y: player.y, angle, speed: 10});
+function placeJojjo(){
+    jojjo.x = Math.floor(Math.random() * canvas.width / gridSize);
+    jojjo.y = Math.floor(Math.random() * canvas.height / gridSize);
 }
 
-function spawnEnemy(){
-    const side = Math.random() < 0.5 ? 'left' : 'right';
-    const x = side === 'left' ? 0 : canvas.width;
-    const y = Math.random()*canvas.height;
-    enemies.push({x, y, width: 50, height: 50, speed: 2}); 
-}
+function update(){
+    if(gameOver) return;
 
-function spawnPowerup(){
-    const x = Math.random() * (canvas.width-20);
-    const y = Math.random() * (canvas.height-20);
-    powerups.push({x, y, width: 20, height: 20, type:'heal'});
+    const head = {x: snake[0].x + direction.x, y: snake[0].y + direction.y};
+    snake.unshift(head);
+
+    // Ät Jojjo
+    if(head.x === jojjo.x && head.y === jojjo.y){
+        score += 10;
+        document.getElementById('score').textContent = "Score: " + score;
+        placeJojjo();
+    } else {
+        snake.pop();
+    }
+
+    // Kollision med väggar
+    if(head.x < 0 || head.x >= canvas.width/gridSize || head.y < 0 || head.y >= canvas.height/gridSize){
+        gameOver = true;
+        alert("Game Over! Score: " + score);
+        resetGame();
+    }
+
+    // Kollision med sig själv
+    for(let i=1;i<snake.length;i++){
+        if(head.x === snake[i].x && head.y === snake[i].y){
+            gameOver = true;
+            alert("Game Over! Score: " + score);
+            resetGame();
+        }
+    }
 }
 
 function resetGame(){
-    alert("Game Over! Score: " + score);
-    player.lives = 3;
+    snake = [{x: 10, y: 10}];
+    direction = {x:0, y:0};
     score = 0;
-    elapsedTime = 0;
-    enemies = [];
-    powerups = [];
-    player.x = canvas.width/2;
-    player.y = canvas.height/2;
+    document.getElementById('score').textContent = "Score: 0";
     gameOver = false;
-}
-
-function update(deltaTime){
-    if(gameOver) return;
-
-    elapsedTime += deltaTime/1000;
-
-    // Player movement
-    if(keys['w'] || keys['ArrowUp']) player.y -= player.speed;
-    if(keys['s'] || keys['ArrowDown']) player.y += player.speed;
-    if(keys['a'] || keys['ArrowLeft']) player.x -= player.speed;
-    if(keys['d'] || keys['ArrowRight']) player.x += player.speed;
-
-    // Keep player in bounds
-    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
-    player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
-
-    // Update bullets
-    player.bullets.forEach((b,i)=>{
-        b.x += Math.cos(b.angle)*b.speed;
-        b.y += Math.sin(b.angle)*b.speed;
-        if(b.x<0||b.x>canvas.width||b.y<0||b.y>canvas.height) player.bullets.splice(i,1);
-    });
-
-    // Update enemies
-    enemies.forEach((e,i)=>{
-        const dx = player.x - e.x;
-        const dy = player.y - e.y;
-        const dist = Math.hypot(dx,dy);
-        e.x += (dx/dist)*e.speed;
-        e.y += (dy/dist)*e.speed;
-
-        // Collision with bullets
-        player.bullets.forEach((b,j)=>{
-            if(b.x<e.x+e.width && b.x>e.x && b.y<e.y+e.height && b.y>e.y){
-                enemies.splice(i,1);
-                player.bullets.splice(j,1);
-                score +=10;
-            }
-        });
-
-        // Collision with player
-        if(player.x<e.x+e.width && player.x+player.width>e.x &&
-           player.y<e.y+e.height && player.y+player.height>e.y){
-            enemies.splice(i,1);
-            player.lives -=1;
-            if(player.lives<=0){
-                gameOver = true;
-                resetGame();
-            }
-        }
-    });
-
-    // Powerups
-    powerups.forEach((p,i)=>{
-        if(player.x<p.x+p.width && player.x+player.width>p.x &&
-           player.y<p.y+p.height && player.y+player.height>p.y){
-            if(p.type==='heal') player.lives = Math.min(player.lives+1,5);
-            powerups.splice(i,1);
-        }
-    });
-
-    // Spawn enemies/powerups
-    if(Date.now() - lastEnemySpawn > 2000){
-        spawnEnemy();
-        lastEnemySpawn = Date.now();
-    }
-    if(Date.now() - lastPowerupSpawn > 8000){
-        spawnPowerup();
-        lastPowerupSpawn = Date.now();
-    }
-
-    // Update HUD
-    document.getElementById('score').textContent = "Score: "+score;
-    document.getElementById('time').textContent = "Tid: "+Math.floor(elapsedTime)+"s";
-    document.getElementById('lives').textContent = "Liv: "+player.lives;
+    placeJojjo();
 }
 
 function draw(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+    // Bakgrund
+    ctx.fillStyle = "#1e1e1e";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Player
-    ctx.fillStyle = player.color;
-    ctx.fillRect(player.x,player.y,player.width,player.height);
+    // Rita Jojjo
+    ctx.fillStyle = "#ffdd57";
+    ctx.beginPath();
+    ctx.arc(jojjo.x * gridSize + gridSize/2, jojjo.y * gridSize + gridSize/2, gridSize/2, 0, Math.PI*2);
+    ctx.fill();
 
-    // Bullets
-    ctx.fillStyle='yellow';
-    player.bullets.forEach(b=>ctx.fillRect(b.x-5,b.y-5,10,10));
-
-    // Enemies med bild
-    enemies.forEach(e=>{
-        if(enemyImg.complete){
-            ctx.drawImage(enemyImg, e.x, e.y, e.width, e.height);
-        } else {
-            // fallback: röd ruta om bilden inte laddats
-            ctx.fillStyle = 'red';
-            ctx.fillRect(e.x, e.y, e.width, e.height);
-        }
+    // Rita ormen
+    snake.forEach((segment, index) => {
+        ctx.fillStyle = index === 0 ? "#ff6b6b" : "#4ecdc4";
+        ctx.fillRect(segment.x*gridSize, segment.y*gridSize, gridSize, gridSize);
+        ctx.strokeStyle = "#1e1e1e";
+        ctx.strokeRect(segment.x*gridSize, segment.y*gridSize, gridSize, gridSize);
     });
-
-    // Powerups
-    ctx.fillStyle='green';
-    powerups.forEach(p=>ctx.fillRect(p.x,p.y,p.width,p.height));
 }
 
-let lastTime = 0;
-function gameLoop(timestamp){
-    const deltaTime = timestamp - lastTime;
-    lastTime = timestamp;
-    update(deltaTime);
+function gameLoop(){
+    update();
     draw();
-    requestAnimationFrame(gameLoop);
 }
 
-requestAnimationFrame(gameLoop);
+placeJojjo();
+setInterval(gameLoop, 150);
 </script>
 </body>
 </html>
