@@ -42,7 +42,6 @@ canvas {
 <body>
 
 <h1>Monster Waves</h1>
-
 <canvas id="game" width="800" height="600"></canvas>
 
 <div id="hud">
@@ -55,13 +54,30 @@ canvas {
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
+// ===== AUDIO =====
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSound(freq, duration, type="sine") {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.value = 0.15;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+}
+
+const soundKill = () => playSound(200, 0.1, "square");
+const soundPower = () => playSound(600, 0.15, "triangle");
+const soundDeath = () => playSound(80, 0.6, "sawtooth");
+
+// ===== PLAYER =====
 const player = {
-    x: 400,
-    y: 300,
-    r: 18,
+    x: 400, y: 300, r: 18,
     speed: 4,
-    hp: 100,
-    maxHp: 100,
+    hp: 100, maxHp: 100,
     bullets: [],
     fireRate: 500,
     lastShot: 0
@@ -78,7 +94,9 @@ document.addEventListener("keydown", e => keys[e.key] = true);
 document.addEventListener("keyup", e => keys[e.key] = false);
 canvas.addEventListener("click", shoot);
 
+// ===== SHOOT =====
 function shoot(e) {
+    if (gameOver) return;
     const now = Date.now();
     if (now - player.lastShot < player.fireRate) return;
     player.lastShot = now;
@@ -88,19 +106,14 @@ function shoot(e) {
     const my = e.clientY - rect.top;
     const a = Math.atan2(my - player.y, mx - player.x);
 
-    player.bullets.push({
-        x: player.x,
-        y: player.y,
-        a,
-        s: 9
-    });
+    player.bullets.push({ x: player.x, y: player.y, a, s: 9 });
 }
 
 // ===== WAVES =====
 function startWave() {
     enemies = [];
-    const count = 3 + wave;               // väldigt lugn ökning
-    const speed = 1.2 + wave * 0.15;      // extremt mjuk svårighetskurva
+    const count = 3 + wave * 2;     // kontrollerad ökning
+    const speed = 1.2 + wave * 0.12;
 
     for (let i = 0; i < count; i++) {
         spawnEnemy(speed);
@@ -108,10 +121,9 @@ function startWave() {
 }
 
 function spawnEnemy(speed) {
-    const edge = Math.random() < 0.5 ? 0 : canvas.width;
     enemies.push({
-        x: edge,
-        y: Math.random() * canvas.height,
+        x: Math.random()<0.5?0:800,
+        y: Math.random()*600,
         r: 14,
         s: speed,
         color: ["red","orange","purple","blue"][Math.floor(Math.random()*4)]
@@ -134,84 +146,81 @@ startWave();
 function update() {
     if (gameOver) return;
 
-    // Movement
     let spd = player.speed;
     if (player.speedBoost) spd *= 1.5;
 
-    if (keys["w"] || keys["ArrowUp"]) player.y -= spd;
-    if (keys["s"] || keys["ArrowDown"]) player.y += spd;
-    if (keys["a"] || keys["ArrowLeft"]) player.x -= spd;
-    if (keys["d"] || keys["ArrowRight"]) player.x += spd;
+    if (keys["w"]||keys["ArrowUp"]) player.y -= spd;
+    if (keys["s"]||keys["ArrowDown"]) player.y += spd;
+    if (keys["a"]||keys["ArrowLeft"]) player.x -= spd;
+    if (keys["d"]||keys["ArrowRight"]) player.x += spd;
 
-    player.x = Math.max(player.r, Math.min(canvas.width-player.r, player.x));
-    player.y = Math.max(player.r, Math.min(canvas.height-player.r, player.y));
+    player.x = Math.max(player.r, Math.min(800-player.r, player.x));
+    player.y = Math.max(player.r, Math.min(600-player.r, player.y));
 
-    // Bullets
     player.bullets.forEach((b,i)=>{
         b.x += Math.cos(b.a)*b.s;
         b.y += Math.sin(b.a)*b.s;
         if (b.x<0||b.y<0||b.x>800||b.y>600) player.bullets.splice(i,1);
     });
 
-    // Enemies
     enemies.forEach((e,ei)=>{
-        const dx = player.x - e.x;
-        const dy = player.y - e.y;
+        const dx = player.x-e.x;
+        const dy = player.y-e.y;
         const d = Math.hypot(dx,dy);
         e.x += dx/d * e.s;
         e.y += dy/d * e.s;
 
-        // Bullet hit
         player.bullets.forEach((b,bi)=>{
             if (Math.hypot(b.x-e.x,b.y-e.y)<e.r) {
                 enemies.splice(ei,1);
                 player.bullets.splice(bi,1);
                 score += 10;
+                soundKill();
             }
         });
 
-        // Player hit
-        if (d < e.r + player.r) {
+        if (d < e.r+player.r) {
             enemies.splice(ei,1);
             player.hp -= 10;
-            if (player.hp <= 0) gameOver = true;
+            if (player.hp <= 0) {
+                gameOver = true;
+                soundDeath();
+            }
         }
     });
 
-    // Powerups
     powerups.forEach((p,i)=>{
         if (Math.hypot(player.x-p.x,player.y-p.y)<player.r+p.r) {
-            if (p.type==="heal") player.hp = Math.min(player.maxHp, player.hp+25);
+            soundPower();
+            if (p.type==="heal") player.hp=Math.min(player.maxHp,player.hp+30);
             if (p.type==="fast") {
-                player.fireRate = 200;
+                player.fireRate=200;
                 setTimeout(()=>player.fireRate=500,5000);
             }
             if (p.type==="speed") {
-                player.speedBoost = true;
+                player.speedBoost=true;
                 setTimeout(()=>player.speedBoost=false,5000);
             }
             powerups.splice(i,1);
         }
     });
 
-    // Next wave (lugnt & tydligt)
-    if (enemies.length === 0) {
+    if (enemies.length===0) {
         wave++;
-        if (Math.random()<0.7) spawnPowerup();
+        if (Math.random()<0.8) spawnPowerup();
         startWave();
     }
 
-    document.getElementById("wave").innerText = "Wave " + wave;
-    document.getElementById("score").innerText = "Score: " + score;
-    document.getElementById("hp").style.width = (player.hp/player.maxHp*100)+"%";
+    document.getElementById("wave").innerText="Wave "+wave;
+    document.getElementById("score").innerText="Score: "+score;
+    document.getElementById("hp").style.width=(player.hp/player.maxHp*100)+"%";
 }
 
 // ===== DRAW =====
 function draw() {
     ctx.clearRect(0,0,800,600);
 
-    // Player (gubbe)
-    ctx.fillStyle = "green";
+    ctx.fillStyle="green";
     ctx.beginPath();
     ctx.arc(player.x,player.y,player.r,0,Math.PI*2);
     ctx.fill();
@@ -222,7 +231,6 @@ function draw() {
     ctx.arc(player.x+5,player.y-5,3,0,Math.PI*2);
     ctx.fill();
 
-    // Bullets
     ctx.fillStyle="yellow";
     player.bullets.forEach(b=>{
         ctx.beginPath();
@@ -230,7 +238,6 @@ function draw() {
         ctx.fill();
     });
 
-    // Enemies
     enemies.forEach(e=>{
         ctx.fillStyle=e.color;
         ctx.beginPath();
@@ -238,18 +245,17 @@ function draw() {
         ctx.fill();
     });
 
-    // Powerups
     powerups.forEach(p=>{
-        ctx.fillStyle = p.type==="heal"?"lime":p.type==="fast"?"cyan":"magenta";
+        ctx.fillStyle=p.type==="heal"?"lime":p.type==="fast"?"cyan":"magenta";
         ctx.beginPath();
         ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
         ctx.fill();
     });
 
     if (gameOver) {
-        ctx.fillStyle="white";
-        ctx.font="40px Arial";
-        ctx.fillText("GAME OVER",280,300);
+        ctx.fillStyle="red";
+        ctx.font="48px Arial";
+        ctx.fillText("GAME OVER",240,300);
     }
 }
 
