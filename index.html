@@ -3,15 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ryberg Survival</title>
+<title>Monster Waves</title>
 <style>
 body {
     text-align: center;
-    background: linear-gradient(135deg,#1f1c2c,#928dab);
+    background: linear-gradient(135deg,#0a0a0a,#3b3b3b);
     color: #fff;
     font-family: Arial, sans-serif;
-    margin:0;
-    padding:0;
+    margin:0; padding:0;
 }
 
 canvas {
@@ -49,27 +48,29 @@ canvas {
 </style>
 </head>
 <body>
-<h1>Ryberg Survival</h1>
+<h1>Monster Waves</h1>
 <canvas id="gameCanvas" width="800" height="600"></canvas>
 <div id="hud">
     <span id="score">Score: 0</span>
     <span id="time">Tid: 0s</span>
+    <span id="wave">Wave: 1</span>
     <div id="healthBar"><div id="healthInner"></div></div>
 </div>
 
 <script>
-// Canvas och spelare
+// Canvas
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// Spelare
 const player = {
     x: canvas.width/2,
     y: canvas.height/2,
     radius: 20,
-    speed: 5,
     color: 'green',
-    maxHealth: 100,
+    speed: 5,
     health: 100,
+    maxHealth: 100,
     bullets: [],
     fireRate: 500,
     lastShot: 0
@@ -81,19 +82,21 @@ let score = 0;
 let elapsedTime = 0;
 let enemies = [];
 let powerups = [];
+let wave = 1;
 let lastEnemySpawn = 0;
 let lastPowerupSpawn = 0;
 let gameOver = false;
 
-// Base64-ljud (för enkelhet)
-const shootSound = new Audio('data:audio/mp3;base64,//uQxAAAAAAAAAAAA...');
-const hitSound = new Audio('data:audio/mp3;base64,//uQxAAAAAAAAAAAA...');
-const powerupSound = new Audio('data:audio/mp3;base64,//uQxAAAAAAAAAAAA...');
-const gameOverSound = new Audio('data:audio/mp3;base64,//uQxAAAAAAAAAAAA...');
+// Base64-ljud (placeholder)
+// Du kan byta till riktiga mp3 i mappen
+const shootSound = new Audio('data:audio/mp3;base64,//uQxAAA...');
+const hitSound = new Audio('data:audio/mp3;base64,//uQxAAA...');
+const powerupSound = new Audio('data:audio/mp3;base64,//uQxAAA...');
+const gameOverSound = new Audio('data:audio/mp3;base64,//uQxAAA...');
 
 document.addEventListener('keydown', e=>keys[e.key]=true);
 document.addEventListener('keyup', e=>keys[e.key]=false);
-canvas.addEventListener('click',shootBullet);
+canvas.addEventListener('click', shootBullet);
 
 function shootBullet(e){
     const now = Date.now();
@@ -108,34 +111,37 @@ function shootBullet(e){
     shootSound.currentTime=0; shootSound.play();
 }
 
-// Fiender
+// Spawn fiender (svårare per wave)
 function spawnEnemy(){
     const side = Math.random()<0.5?'left':'right';
     const x = side==='left'?0:canvas.width;
     const y = Math.random()*canvas.height;
     const size = Math.random()*15 + 15;
+    const speed = 2 + Math.random()*2 + wave*0.3; // snabbare varje wave
     const colors = ['red','orange','purple','blue'];
     const color = colors[Math.floor(Math.random()*colors.length)];
-    enemies.push({x,y,radius:size,speed:2+Math.random()*2,color});
+    enemies.push({x,y,radius:size,speed,color});
 }
 
-// Powerups
+// Spawn powerup
 function spawnPowerup(){
     const x = Math.random()*(canvas.width-20)+10;
     const y = Math.random()*(canvas.height-20)+10;
-    const type = Math.random()<0.5?'heal':'fast';
+    const type = Math.random()<0.33?'heal':(Math.random()<0.5?'fast':'speed');
     powerups.push({x,y,radius:10,type});
 }
 
-// Reset
+// Reset game
 function resetGame(){
     player.health = player.maxHealth;
     player.x = canvas.width/2;
     player.y = canvas.height/2;
-    enemies=[]; powerups=[];
+    enemies = [];
+    powerups = [];
     score = 0;
-    elapsedTime=0;
-    gameOver=false;
+    elapsedTime = 0;
+    wave = 1;
+    gameOver = false;
     gameOverSound.play();
 }
 
@@ -145,10 +151,12 @@ function update(deltaTime){
     elapsedTime += deltaTime/1000;
 
     // Rörelse
-    if(keys['w']||keys['ArrowUp']) player.y -= player.speed;
-    if(keys['s']||keys['ArrowDown']) player.y += player.speed;
-    if(keys['a']||keys['ArrowLeft']) player.x -= player.speed;
-    if(keys['d']||keys['ArrowRight']) player.x += player.speed;
+    let currentSpeed = player.speed;
+    if(player.speedBoost) currentSpeed *= 1.5;
+    if(keys['w']||keys['ArrowUp']) player.y -= currentSpeed;
+    if(keys['s']||keys['ArrowDown']) player.y += currentSpeed;
+    if(keys['a']||keys['ArrowLeft']) player.x -= currentSpeed;
+    if(keys['d']||keys['ArrowRight']) player.x += currentSpeed;
 
     player.x = Math.max(player.radius,Math.min(canvas.width-player.radius,player.x));
     player.y = Math.max(player.radius,Math.min(canvas.height-player.radius,player.y));
@@ -168,12 +176,12 @@ function update(deltaTime){
         e.x += (dx/dist)*e.speed;
         e.y += (dy/dist)*e.speed;
 
-        // Koll med skott
+        // Skott träff
         player.bullets.forEach((b,j)=>{
             if(Math.hypot(b.x-e.x,b.y-e.y)<e.radius){
                 enemies.splice(i,1);
                 player.bullets.splice(j,1);
-                score+=10;
+                score += 10;
                 hitSound.currentTime=0; hitSound.play();
             }
         });
@@ -198,18 +206,25 @@ function update(deltaTime){
             } else if(p.type==='fast'){
                 player.fireRate = 200;
                 setTimeout(()=>player.fireRate=500,5000);
+            } else if(p.type==='speed'){
+                player.speedBoost = true;
+                setTimeout(()=>player.speedBoost=false,5000);
             }
             powerupSound.currentTime=0; powerupSound.play();
         }
     });
 
     // Spawn fiender/powerups
-    if(Date.now()-lastEnemySpawn>2000){spawnEnemy(); lastEnemySpawn=Date.now();}
+    if(Date.now()-lastEnemySpawn > Math.max(500,2000-wave*100)){spawnEnemy(); lastEnemySpawn=Date.now();}
     if(Date.now()-lastPowerupSpawn>8000){spawnPowerup(); lastPowerupSpawn=Date.now();}
+
+    // Wave progression
+    if(enemies.length===0) wave++;
 
     // HUD
     document.getElementById('score').textContent="Score: "+score;
     document.getElementById('time').textContent="Tid: "+Math.floor(elapsedTime)+"s";
+    document.getElementById('wave').textContent="Wave: "+wave;
     const healthPct = (player.health/player.maxHealth)*100;
     document.getElementById('healthInner').style.width = healthPct+"%";
 }
@@ -222,6 +237,17 @@ function draw(){
     ctx.fillStyle=player.color;
     ctx.beginPath();
     ctx.arc(player.x,player.y,player.radius,0,Math.PI*2);
+    ctx.fill();
+    // Ögon (för lite gubbe-känsla)
+    ctx.fillStyle='white';
+    ctx.beginPath();
+    ctx.arc(player.x-7,player.y-5,4,0,Math.PI*2);
+    ctx.arc(player.x+7,player.y-5,4,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='black';
+    ctx.beginPath();
+    ctx.arc(player.x-7,player.y-5,2,0,Math.PI*2);
+    ctx.arc(player.x+7,player.y-5,2,0,Math.PI*2);
     ctx.fill();
 
     // Skott
@@ -238,11 +264,16 @@ function draw(){
         ctx.beginPath();
         ctx.arc(e.x,e.y,e.radius,0,Math.PI*2);
         ctx.fill();
+        ctx.fillStyle='black';
+        ctx.beginPath();
+        ctx.arc(e.x-3,e.y-3,3,0,Math.PI*2);
+        ctx.arc(e.x+3,e.y-3,3,0,Math.PI*2);
+        ctx.fill();
     });
 
     // Powerups
     powerups.forEach(p=>{
-        ctx.fillStyle=p.type==='heal'?'lime':'cyan';
+        ctx.fillStyle=p.type==='heal'?'lime':(p.type==='fast'?'cyan':'magenta');
         ctx.beginPath();
         ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);
         ctx.fill();
