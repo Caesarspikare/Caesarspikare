@@ -60,6 +60,10 @@ let lastEnemySpawn = 0;
 let lastPowerupSpawn = 0;
 let gameOver = false;
 
+// Ladda fiendebilden (din fil från telefon)
+const enemyImg = new Image();
+enemyImg.src = "ryberg.jpg"; // <-- din bild
+
 document.addEventListener('keydown', e => keys[e.key] = true);
 document.addEventListener('keyup', e => keys[e.key] = false);
 canvas.addEventListener('click', shootBullet);
@@ -76,7 +80,7 @@ function spawnEnemy(){
     const side = Math.random() < 0.5 ? 'left' : 'right';
     const x = side === 'left' ? 0 : canvas.width;
     const y = Math.random()*canvas.height;
-    enemies.push({x, y, width: 40, height: 40, speed: 2});
+    enemies.push({x, y, width: 50, height: 50, speed: 2}); 
 }
 
 function spawnPowerup(){
@@ -184,9 +188,16 @@ function draw(){
     ctx.fillStyle='yellow';
     player.bullets.forEach(b=>ctx.fillRect(b.x-5,b.y-5,10,10));
 
-    // Enemies
-    ctx.fillStyle='red';
-    enemies.forEach(e=>ctx.fillRect(e.x,e.y,e.width,e.height));
+    // Enemies med bild
+    enemies.forEach(e=>{
+        if(enemyImg.complete){
+            ctx.drawImage(enemyImg, e.x, e.y, e.width, e.height);
+        } else {
+            // fallback: röd ruta om bilden inte laddats
+            ctx.fillStyle = 'red';
+            ctx.fillRect(e.x, e.y, e.width, e.height);
+        }
+    });
 
     // Powerups
     ctx.fillStyle='green';
@@ -206,4 +217,3 @@ requestAnimationFrame(gameLoop);
 </script>
 </body>
 </html>
-enemyImg.src = "friend.png"; // ryberg.jpg
