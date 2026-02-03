@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<title>Klick-spelet</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #0f0f0f;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+  }
+  .game {
+    text-align: center;
+  }
+  button {
+    font-size: 24px;
+    padding: 20px 40px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    background: #00ff88;
+    color: black;
+  }
+  button:active {
+    transform: scale(0.95);
+  }
+</style>
+</head>
+<body>
+
+<div class="game">
+  <h1>KLICKA SPELET 🎮</h1>
+  <p>Poäng: <span id="score">0</span></p>
+  <p>Tid: <span id="time">10</span>s</p>
+  <button onclick="clickMe()">KLICKA!</button>
+  <p id="result"></p>
+</div>
+
+<script>
+let score = 0;
+let time = 10;
+let gameOver = false;
+
+function clickMe() {
+  if (gameOver) return;
+  score++;
+  document.getElementById("score").innerText = score;
+}
+
+let timer = setInterval(() => {
+  time--;
+  document.getElementById("time").innerText = time;
+
+  if (time <= 0) {
+    gameOver = true;
+    clearInterval(timer);
+    document.getElementById("result").innerText =
+      "Game over 😈 Poäng: " + score;
+  }
+}, 1000);
+</script>
+
+</body>
+</html>
