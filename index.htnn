@@ -1,1 +1,58 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <title>Min hemsida</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #222;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+    }
+    main {
+      padding: 2rem;
+      max-width: 800px;
+      margin: auto;
+      background: white;
+    }
+    footer {
+      text-align: center;
+      padding: 1rem;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Hej 👋</h1>
+  <p>Välkommen till min GitHub-hemsida</p>
+</header>
+
+<main>
+  <h2>Om sidan</h2>
+  <p>
+    Det här är en enkel HTML-sida hostad med GitHub Pages.
+  </p>
+
+  <h2>Kontakt</h2>
+  <p>
+    📧 din@email.se  
+  </p>
+</main>
+
+<footer>
+  © 2026 Ditt namn
+</footer>
+
+</body>
+</html>
 
