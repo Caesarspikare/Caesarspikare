@@ -1,1 +1,29 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+)
+
+func main() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+	<meta charset="UTF-8">
+	<title>Go sida</title>
+</head>
+<body>
+	<h1>GO FUNKAR 🚀</h1>
+	<p>Den här sidan serveras av Go.</p>
+</body>
+</html>
+`)
+	})
+
+	log.Println("Server körs på http://localhost:8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
 
