@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ryberg Survival</title>
+<title>Ryberg Survival - Färgglada fiender</title>
 <style>
 body {
     text-align: center;
@@ -14,9 +14,10 @@ body {
 
 canvas {
     background-color: #222;
-    border: 2px solid #fff;
+    border-radius: 15px;
+    border: 3px solid #fff;
     display: block;
-    margin: 0 auto;
+    margin: 20px auto;
 }
 
 #hud {
@@ -24,7 +25,8 @@ canvas {
     font-size: 20px;
     display: flex;
     justify-content: center;
-    gap: 20px;
+    gap: 30px;
+    font-weight: bold;
 }
 </style>
 </head>
@@ -36,61 +38,74 @@ canvas {
     <span id="time">Tid: 0s</span>
     <span id="lives">Liv: 3</span>
 </div>
+
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// Spelare
 const player = {
     x: canvas.width/2,
     y: canvas.height/2,
-    width: 40,
-    height: 40,
+    radius: 20,
     speed: 5,
-    color: 'blue',
+    color: 'green',
     lives: 3,
     bullets: []
 };
 
-let keys = {};
-let score = 0;
-let elapsedTime = 0;
+// Ljud (lägg mp3-filer i samma mapp)
+const shootSound = new Audio('shoot.mp3');
+const hitSound = new Audio('hit.mp3');
+const powerupSound = new Audio('powerup.mp3');
+const gameOverSound = new Audio('gameover.mp3');
+
+// Fiender och powerups
 let enemies = [];
 let powerups = [];
+let score = 0;
+let elapsedTime = 0;
 let lastEnemySpawn = 0;
 let lastPowerupSpawn = 0;
 let gameOver = false;
 
-// Ladda fiendebilden (din fil från telefon)
-const enemyImg = new Image();
-enemyImg.src = "ryberg.jpg"; // <-- din bild
+let keys = {};
 
 document.addEventListener('keydown', e => keys[e.key] = true);
 document.addEventListener('keyup', e => keys[e.key] = false);
 canvas.addEventListener('click', shootBullet);
 
+// Skott
 function shootBullet(e){
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
     player.bullets.push({x: player.x, y: player.y, angle, speed: 10});
+    shootSound.currentTime = 0;
+    shootSound.play();
 }
 
+// Spawn fiender
 function spawnEnemy(){
     const side = Math.random() < 0.5 ? 'left' : 'right';
     const x = side === 'left' ? 0 : canvas.width;
     const y = Math.random()*canvas.height;
-    enemies.push({x, y, width: 50, height: 50, speed: 2}); 
+    const size = Math.random()*15 + 15; // mindre fiender
+    const colors = ['red', 'orange', 'purple', 'blue']; // olika färger
+    const color = colors[Math.floor(Math.random()*colors.length)];
+    enemies.push({x, y, radius: size, speed: 2 + Math.random()*2, color});
 }
 
+// Spawn powerup
 function spawnPowerup(){
-    const x = Math.random() * (canvas.width-20);
-    const y = Math.random() * (canvas.height-20);
-    powerups.push({x, y, width: 20, height: 20, type:'heal'});
+    const x = Math.random()*(canvas.width-20)+10;
+    const y = Math.random()*(canvas.height-20)+10;
+    powerups.push({x, y, radius: 10, type:'heal'});
 }
 
+// Reset game
 function resetGame(){
-    alert("Game Over! Score: " + score);
     player.lives = 3;
     score = 0;
     elapsedTime = 0;
@@ -99,31 +114,32 @@ function resetGame(){
     player.x = canvas.width/2;
     player.y = canvas.height/2;
     gameOver = false;
+    gameOverSound.play();
 }
 
+// Update
 function update(deltaTime){
     if(gameOver) return;
 
     elapsedTime += deltaTime/1000;
 
-    // Player movement
+    // Rörelse
     if(keys['w'] || keys['ArrowUp']) player.y -= player.speed;
     if(keys['s'] || keys['ArrowDown']) player.y += player.speed;
     if(keys['a'] || keys['ArrowLeft']) player.x -= player.speed;
     if(keys['d'] || keys['ArrowRight']) player.x += player.speed;
 
-    // Keep player in bounds
-    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
-    player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+    player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
+    player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
 
-    // Update bullets
+    // Skott
     player.bullets.forEach((b,i)=>{
         b.x += Math.cos(b.angle)*b.speed;
         b.y += Math.sin(b.angle)*b.speed;
         if(b.x<0||b.x>canvas.width||b.y<0||b.y>canvas.height) player.bullets.splice(i,1);
     });
 
-    // Update enemies
+    // Fiender
     enemies.forEach((e,i)=>{
         const dx = player.x - e.x;
         const dy = player.y - e.y;
@@ -131,18 +147,21 @@ function update(deltaTime){
         e.x += (dx/dist)*e.speed;
         e.y += (dy/dist)*e.speed;
 
-        // Collision with bullets
+        // Skott träff
         player.bullets.forEach((b,j)=>{
-            if(b.x<e.x+e.width && b.x>e.x && b.y<e.y+e.height && b.y>e.y){
+            const d = Math.hypot(b.x-e.x, b.y-e.y);
+            if(d < e.radius){
                 enemies.splice(i,1);
                 player.bullets.splice(j,1);
-                score +=10;
+                score += 10;
+                hitSound.currentTime = 0;
+                hitSound.play();
             }
         });
 
-        // Collision with player
-        if(player.x<e.x+e.width && player.x+player.width>e.x &&
-           player.y<e.y+e.height && player.y+player.height>e.y){
+        // Koll med spelare
+        const distPlayer = Math.hypot(player.x-e.x, player.y-e.y);
+        if(distPlayer < e.radius + player.radius){
             enemies.splice(i,1);
             player.lives -=1;
             if(player.lives<=0){
@@ -154,14 +173,16 @@ function update(deltaTime){
 
     // Powerups
     powerups.forEach((p,i)=>{
-        if(player.x<p.x+p.width && player.x+player.width>p.x &&
-           player.y<p.y+p.height && player.y+player.height>p.y){
-            if(p.type==='heal') player.lives = Math.min(player.lives+1,5);
+        const d = Math.hypot(player.x - p.x, player.y - p.y);
+        if(d < player.radius + p.radius){
             powerups.splice(i,1);
+            player.lives = Math.min(player.lives+1,5);
+            powerupSound.currentTime = 0;
+            powerupSound.play();
         }
     });
 
-    // Spawn enemies/powerups
+    // Spawna fiender/powerups
     if(Date.now() - lastEnemySpawn > 2000){
         spawnEnemy();
         lastEnemySpawn = Date.now();
@@ -171,37 +192,45 @@ function update(deltaTime){
         lastPowerupSpawn = Date.now();
     }
 
-    // Update HUD
+    // HUD
     document.getElementById('score').textContent = "Score: "+score;
     document.getElementById('time').textContent = "Tid: "+Math.floor(elapsedTime)+"s";
     document.getElementById('lives').textContent = "Liv: "+player.lives;
 }
 
+// Draw
 function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // Player
+    // Spelare
     ctx.fillStyle = player.color;
-    ctx.fillRect(player.x,player.y,player.width,player.height);
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.radius, 0, Math.PI*2);
+    ctx.fill();
 
-    // Bullets
+    // Skott
     ctx.fillStyle='yellow';
-    player.bullets.forEach(b=>ctx.fillRect(b.x-5,b.y-5,10,10));
+    player.bullets.forEach(b=>{
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 5, 0, Math.PI*2);
+        ctx.fill();
+    });
 
-    // Enemies med bild
+    // Fiender
     enemies.forEach(e=>{
-        if(enemyImg.complete){
-            ctx.drawImage(enemyImg, e.x, e.y, e.width, e.height);
-        } else {
-            // fallback: röd ruta om bilden inte laddats
-            ctx.fillStyle = 'red';
-            ctx.fillRect(e.x, e.y, e.width, e.height);
-        }
+        ctx.fillStyle = e.color;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2);
+        ctx.fill();
     });
 
     // Powerups
-    ctx.fillStyle='green';
-    powerups.forEach(p=>ctx.fillRect(p.x,p.y,p.width,p.height));
+    powerups.forEach(p=>{
+        ctx.fillStyle='magenta';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
+        ctx.fill();
+    });
 }
 
 let lastTime = 0;
