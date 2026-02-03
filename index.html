@@ -2,102 +2,158 @@
 <html lang="sv">
 <head>
 <meta charset="UTF-8">
-<title>Reaction Game</title>
+<title>Dodge Game med Ljud</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   body {
     margin: 0;
     background: #111;
-    color: white;
-    font-family: Arial, sans-serif;
     overflow: hidden;
+    font-family: Arial, sans-serif;
   }
   #score {
     position: fixed;
     top: 10px;
     left: 10px;
-    font-size: 20px;
+    color: white;
+    font-size: 24px;
   }
-  #time {
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    font-size: 20px;
-  }
-  #box {
-    width: 80px;
-    height: 80px;
-    background: #ff3c3c;
-    position: absolute;
-    border-radius: 10px;
-    cursor: pointer;
-  }
-  #gameover {
-    display: none;
+  #gameOver {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.9);
-    align-items: center;
+    display: none;
     justify-content: center;
+    align-items: center;
+    background: rgba(0,0,0,0.9);
+    color: white;
+    flex-direction: column;
     text-align: center;
   }
-  #gameover h1 {
-    font-size: 40px;
+  #player {
+    width: 50px;
+    height: 50px;
+    background: #00ffdd;
+    position: absolute;
+    bottom: 20px;
+    left: calc(50% - 25px);
+    border-radius: 10px;
+  }
+  .enemy {
+    width: 50px;
+    height: 50px;
+    background: #ff3c3c;
+    position: absolute;
+    top: 0;
+    border-radius: 10px;
   }
 </style>
 </head>
 <body>
 
-<div id="score">Score: 0</div>
-<div id="time">Time: 20</div>
-<div id="box"></div>
-
-<div id="gameover">
-  <div>
-    <h1>GAME OVER</h1>
-    <p id="finalScore"></p>
-    <button onclick="location.reload()">Spela igen</button>
-  </div>
+<div id="score">Poäng: 0</div>
+<div id="player"></div>
+<div id="gameOver">
+  <h1>GAME OVER 💀</h1>
+  <p id="finalScore"></p>
+  <button onclick="location.reload()">Spela igen</button>
 </div>
 
 <script>
-let score = 0;
-let time = 20;
-let speed = 1000;
-const box = document.getElementById("box");
-
-function moveBox() {
-  const x = Math.random() * (window.innerWidth - 80);
-  const y = Math.random() * (window.innerHeight - 80);
-  box.style.left = x + "px";
-  box.style.top = y + "px";
+// ===== AUDIO =====
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playBeep(freq, duration) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.frequency.value = freq;
+  osc.type = "square";
+  gain.gain.value = 0.1;
+  osc.start();
+  setTimeout(() => osc.stop(), duration);
 }
 
-box.onclick = () => {
-  score++;
-  document.getElementById("score").innerText = "Score: " + score;
-  speed = Math.max(300, speed - 60);
-  clearInterval(moveInterval);
-  moveInterval = setInterval(moveBox, speed);
-  moveBox();
-};
+// ===== GAME =====
+const player = document.getElementById('player');
+let score = 0;
+let playerX = window.innerWidth/2 - 25;
+let enemies = [];
+let gameSpeed = 2;
+let isGameOver = false;
 
-moveBox();
-let moveInterval = setInterval(moveBox, speed);
+// styrning
+document.addEventListener('keydown', (e)=>{
+  const step = 30;
+  if(e.key === "ArrowLeft") playerX -= step;
+  if(e.key === "ArrowRight") playerX += step;
+  if(playerX < 0) playerX = 0;
+  if(playerX > window.innerWidth-50) playerX = window.innerWidth-50;
+  player.style.left = playerX + "px";
+});
 
-let timer = setInterval(() => {
-  time--;
-  document.getElementById("time").innerText = "Time: " + time;
+// skapa fiende
+function spawnEnemy() {
+  const enemy = document.createElement('div');
+  enemy.classList.add('enemy');
+  enemy.style.left = Math.random() * (window.innerWidth-50) + "px";
+  enemy.style.top = "0px";
+  document.body.appendChild(enemy);
+  enemies.push(enemy);
+}
 
-  if (time <= 0) {
-    clearInterval(timer);
-    clearInterval(moveInterval);
-    box.style.display = "none";
-    document.getElementById("finalScore").innerText =
-      "Din score: " + score;
-    document.getElementById("gameover").style.display = "flex";
+// rörelse fiender
+function updateEnemies() {
+  enemies.forEach((enemy, index)=>{
+    let y = parseInt(enemy.style.top);
+    y += gameSpeed;
+    enemy.style.top = y + "px";
+
+    // kollision
+    const ex = parseInt(enemy.style.left);
+    const ey = y;
+    const px = playerX;
+    const py = parseInt(player.style.bottom || 20);
+
+    if(ey + 50 >= window.innerHeight - 70 && ex + 50 > px && ex < px + 50){
+      endGame();
+    }
+
+    // ta bort fiender som gått ut
+    if(y > window.innerHeight){
+      enemy.remove();
+      enemies.splice(index,1);
+      score++;
+      document.getElementById('score').innerText = "Poäng: " + score;
+      playBeep(600, 50);
+    }
+  });
+}
+
+// game over
+function endGame() {
+  if(isGameOver) return;
+  isGameOver = true;
+  playBeep(150, 600);
+  document.getElementById('finalScore').innerText = "Din poäng: " + score;
+  document.getElementById('gameOver').style.display = "flex";
+}
+
+// game loop
+function gameLoop() {
+  if(!isGameOver){
+    updateEnemies();
+    requestAnimationFrame(gameLoop);
   }
-}, 1000);
+}
+gameLoop();
+
+// spawn fiender varje sekund
+setInterval(spawnEnemy, 1000);
+
+// öka svårighet
+setInterval(()=>{
+  if(gameSpeed < 10) gameSpeed += 0.2;
+}, 3000);
 </script>
 
 </body>
