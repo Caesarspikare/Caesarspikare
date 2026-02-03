@@ -2,66 +2,100 @@
 <html lang="sv">
 <head>
 <meta charset="UTF-8">
-<title>Klick-spelet</title>
+<title>Reaction Game</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   body {
     margin: 0;
-    font-family: Arial, sans-serif;
-    background: #0f0f0f;
+    background: #111;
     color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
+    font-family: Arial, sans-serif;
+    overflow: hidden;
   }
-  .game {
-    text-align: center;
+  #score {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    font-size: 20px;
   }
-  button {
-    font-size: 24px;
-    padding: 20px 40px;
-    border: none;
+  #time {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    font-size: 20px;
+  }
+  #box {
+    width: 80px;
+    height: 80px;
+    background: #ff3c3c;
+    position: absolute;
     border-radius: 10px;
     cursor: pointer;
-    background: #00ff88;
-    color: black;
   }
-  button:active {
-    transform: scale(0.95);
+  #gameover {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  #gameover h1 {
+    font-size: 40px;
   }
 </style>
 </head>
 <body>
 
-<div class="game">
-  <h1>KLICKA SPELET 🎮</h1>
-  <p>Poäng: <span id="score">0</span></p>
-  <p>Tid: <span id="time">10</span>s</p>
-  <button onclick="clickMe()">KLICKA!</button>
-  <p id="result"></p>
+<div id="score">Score: 0</div>
+<div id="time">Time: 20</div>
+<div id="box"></div>
+
+<div id="gameover">
+  <div>
+    <h1>GAME OVER</h1>
+    <p id="finalScore"></p>
+    <button onclick="location.reload()">Spela igen</button>
+  </div>
 </div>
 
 <script>
 let score = 0;
-let time = 10;
-let gameOver = false;
+let time = 20;
+let speed = 1000;
+const box = document.getElementById("box");
 
-function clickMe() {
-  if (gameOver) return;
-  score++;
-  document.getElementById("score").innerText = score;
+function moveBox() {
+  const x = Math.random() * (window.innerWidth - 80);
+  const y = Math.random() * (window.innerHeight - 80);
+  box.style.left = x + "px";
+  box.style.top = y + "px";
 }
+
+box.onclick = () => {
+  score++;
+  document.getElementById("score").innerText = "Score: " + score;
+  speed = Math.max(300, speed - 60);
+  clearInterval(moveInterval);
+  moveInterval = setInterval(moveBox, speed);
+  moveBox();
+};
+
+moveBox();
+let moveInterval = setInterval(moveBox, speed);
 
 let timer = setInterval(() => {
   time--;
-  document.getElementById("time").innerText = time;
+  document.getElementById("time").innerText = "Time: " + time;
 
   if (time <= 0) {
-    gameOver = true;
     clearInterval(timer);
-    document.getElementById("result").innerText =
-      "Game over 😈 Poäng: " + score;
+    clearInterval(moveInterval);
+    box.style.display = "none";
+    document.getElementById("finalScore").innerText =
+      "Din score: " + score;
+    document.getElementById("gameover").style.display = "flex";
   }
 }, 1000);
 </script>
